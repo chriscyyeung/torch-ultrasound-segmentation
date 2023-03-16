@@ -1,15 +1,19 @@
 import os
 import glob
+import re
 import tqdm
+import random
 import numpy as np
 import torch
 import torchvision
 import SimpleITK as sitk
+import matplotlib.pyplot as plt
 from torch.utils.data import Dataset
+from torchvision import transforms
 
 
 class PICAIDataset(Dataset):
-    def __init__(self, img_dirs, mask_dir, img_type, transform=None, preprocess=False):
+    def __init__(self, img_dirs, mask_dir, img_type, transform=None, target_transform=None, preprocess=False):
         assert img_type in {"t2w", "hbv", "adc"}
 
         # img_dir expects a list of directories for each fold
@@ -46,8 +50,13 @@ class PICAIDataset(Dataset):
             else:  # Cancer lesion ground truth
                 mask_images = glob.glob(os.path.join(mask_dir, "csPCa_lesion_delineations/AI/Bosma22a/*.tiff"))
             self.masks = [mask for mask in mask_images if mask.split(os.sep)[-1][:5] in case_ids]
+        
+        # Sort images and masks to ensure proper indexing
+        self.images.sort(key=self.natural_keys)
+        self.masks.sort(key=self.natural_keys)
 
         self.transform = transform
+        self.target_transform = target_transform
     
     def __len__(self):
         return len(self.images)
@@ -59,8 +68,18 @@ class PICAIDataset(Dataset):
         image = sitk.GetArrayFromImage(image).astype(np.float32)
         label = sitk.GetArrayFromImage(label).astype(np.float32)
 
+        # Seed to allow image and label to have same random transformations
+        seed = np.random.randint(2023)
+
+        random.seed(seed)
+        torch.manual_seed(seed)
         if self.transform:
             image = self.transform(image)
+        
+        random.seed(seed)
+        torch.manual_seed(seed)
+        if self.target_transform:
+            label = self.target_transform(label)
 
         return image, label
     
@@ -86,6 +105,9 @@ class PICAIDataset(Dataset):
             images.append(image_name)
 
         return images
+
+    def natural_keys(self, text):
+        return [self.atoi(c) for c in re.split(r"(\d+)", text.split(os.sep)[-1])]
     
     @staticmethod
     def resample_to_new_spacing(image, spacing, interpolator):
@@ -103,6 +125,21 @@ class PICAIDataset(Dataset):
         resample.SetTransform(sitk.Transform())
         resample.SetDefaultPixelValue(image.GetPixelIDValue())
         image = resample.Execute(image)
+
+        return image
+
+    @staticmethod
+    def atoi(text):
+        return int(text) if text.isdigit() else text
+
+
+# PyTorch ToTensor() normalizes from [0, 255] to [0, 1]
+class ToTensor(object):
+    def __call__(self, image):
+        image = image[..., np.newaxis]
+        image = image.transpose((2, 0, 1))  # Swap axis from (H, W, C) to (C, H, W)
+        image = torch.from_numpy(image).contiguous()
+
         return image
 
 
@@ -114,17 +151,24 @@ if __name__ == "__main__":
     test_img_dirs = ["e:/CISC881/picai_public_images_fold0"]
     mask_dir = "e:/CISC881/picai_labels"
 
-    t2w_data = PICAIDataset(train_img_dirs, mask_dir, "t2w", preprocess=True)
-    t2w_val = PICAIDataset(val_img_dirs, mask_dir, "t2w", preprocess=True)
-    t2w_test = PICAIDataset(test_img_dirs, mask_dir, "t2w", preprocess=True)
+    transform = transforms.Compose([ToTensor(), 
+                                    transforms.RandomHorizontalFlip(0.5),
+                                    transforms.Normalize(0, 1)])
+    
+    target_transform = transforms.Compose([ToTensor(),
+                                           transforms.RandomHorizontalFlip(0.5)])
 
-    hbv_data = PICAIDataset(train_img_dirs, mask_dir, "hbv", preprocess=True)
-    hbv_val = PICAIDataset(val_img_dirs, mask_dir, "hbv", preprocess=True)
-    hbv_test = PICAIDataset(test_img_dirs, mask_dir, "hbv", preprocess=True)
+    t2w_data = PICAIDataset(train_img_dirs, mask_dir, "t2w", transform=transform, target_transform=target_transform)
+    t2w_val = PICAIDataset(val_img_dirs, mask_dir, "t2w", transform=transform, target_transform=target_transform)
+    t2w_test = PICAIDataset(test_img_dirs, mask_dir, "t2w", transform=transform, target_transform=target_transform)
 
-    adc_data = PICAIDataset(train_img_dirs, mask_dir, "adc", preprocess=True)
-    adc_val = PICAIDataset(val_img_dirs, mask_dir, "adc", preprocess=True)
-    adc_test = PICAIDataset(test_img_dirs, mask_dir, "adc", preprocess=True)
+    hbv_data = PICAIDataset(train_img_dirs, mask_dir, "hbv", transform=transform, target_transform=target_transform)
+    hbv_val = PICAIDataset(val_img_dirs, mask_dir, "hbv", transform=transform, target_transform=target_transform)
+    hbv_test = PICAIDataset(test_img_dirs, mask_dir, "hbv", transform=transform, target_transform=target_transform)
+
+    adc_data = PICAIDataset(train_img_dirs, mask_dir, "adc", transform=transform, target_transform=target_transform)
+    adc_val = PICAIDataset(val_img_dirs, mask_dir, "adc", transform=transform, target_transform=target_transform)
+    adc_test = PICAIDataset(test_img_dirs, mask_dir, "adc", transform=transform, target_transform=target_transform)
 
     print(f"t2w training images: {len(t2w_data)}, t2w training masks: {len(t2w_data.masks)}")
     print(f"t2w validation images: {len(t2w_val)}, t2w validation masks: {len(t2w_val.masks)}")
@@ -137,3 +181,10 @@ if __name__ == "__main__":
     print(f"adc training images: {len(adc_data)}, adc training masks: {len(adc_data.masks)}")
     print(f"adc validation images: {len(adc_val)}, adc validation masks: {len(adc_val.masks)}")
     print(f"adc test images: {len(adc_test)}, adc test masks: {len(adc_test.masks)}")
+
+    sample = hbv_data[1118]
+    plt.imshow(sample[0][0], cmap="gray")
+    plt.show()
+
+    plt.imshow(sample[1][0], cmap="gray")
+    plt.show()
