@@ -6,7 +6,7 @@ dependencies:
   - python=3.9
   - matplotlib
   - simpleitk
-  - cudatoolkit=11.2
+  - cudatoolkit=11.8
   - pytorch
   - torchvision
   - tqdm
