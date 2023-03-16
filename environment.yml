@@ -1,0 +1,13 @@
+name: torch-gpu
+channels:
+  - conda-forge
+  - pytorch
+dependencies:
+  - python=3.9
+  - matplotlib
+  - simpleitk
+  - cudatoolkit=11.2
+  - pytorch
+  - torchvision
+  - tqdm
+  - wandb
