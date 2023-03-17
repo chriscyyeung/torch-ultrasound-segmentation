@@ -5,7 +5,6 @@ import tqdm
 import random
 import numpy as np
 import torch
-import torchvision
 import SimpleITK as sitk
 import matplotlib.pyplot as plt
 from torch.utils.data import Dataset
@@ -144,12 +143,13 @@ class ToTensor(object):
 
 
 if __name__ == "__main__":
-    train_img_dirs = ["e:/CISC881/picai_public_images_fold1", 
-                      "e:/CISC881/picai_public_images_fold2", 
-                      "e:/CISC881/picai_public_images_fold4"]
-    val_img_dirs = ["e:/CISC881/picai_public_images_fold3"]
-    test_img_dirs = ["e:/CISC881/picai_public_images_fold0"]
-    mask_dir = "e:/CISC881/picai_labels"
+    # train_img_dirs = ["d:/Chris/PICAI/data/picai_public_images_fold1", 
+    #                   "d:/Chris/PICAI/data/picai_public_images_fold2", 
+    #                   "d:/Chris/PICAI/data/picai_public_images_fold4"]
+    train_img_dirs = ["d:/Chris/PICAI/data/picai_public_images_fold1"]
+    val_img_dirs = ["d:/Chris/PICAI/data/picai_public_images_fold3"]
+    test_img_dirs = ["d:/Chris/PICAI/data/picai_public_images_fold0"]
+    mask_dir = "d:/Chris/PICAI/data/picai_labels"
 
     transform = transforms.Compose([ToTensor(), 
                                     transforms.RandomHorizontalFlip(0.5),

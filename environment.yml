@@ -1,13 +1,17 @@
 name: torch-gpu
 channels:
-  - conda-forge
   - pytorch
+  - nvidia
+  - conda-forge
 dependencies:
+  - pip
   - python=3.9
   - matplotlib
   - simpleitk
-  - cudatoolkit=11.8
-  - pytorch
+  - pytorch-cuda=11.8
   - torchvision
+  - torchmetrics
   - tqdm
   - wandb
+  - pip:
+    - torch-summary
