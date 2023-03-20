@@ -5,6 +5,7 @@ import wandb
 import numpy as np
 import torch
 import torchvision.transforms as transforms
+import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ExponentialLR
@@ -68,13 +69,7 @@ def main(FLAGS):
     # Initialize model
     model = UNet(1, 64, 1)
     model.to(device)
-    # Initialize logger
-    experiment = wandb.init(
-        project="cisc881-prostate-cancer-segmentation",
-        config={
-            "epochs": epochs, "batch_size": batch_size, "lr": lr, "img_type": img_type, "loss_fn": "weighted_bce"
-        }
-    )
+
     # Training settings
     optimizer = Adam(model.parameters(), lr=lr)
     scheduler = ExponentialLR(optimizer, gamma=0.90)
@@ -82,14 +77,22 @@ def main(FLAGS):
     loss_fn = BCEWithLogitsLoss(pos_weight=torch.FloatTensor([9.])).cuda()
     metric = BinaryAccuracy().to(device)
 
+    # Initialize logger
+    experiment = wandb.init(
+        project="cisc881-prostate-cancer-segmentation",
+        config={
+            "epochs": epochs, "batch_size": batch_size, "lr": lr, "img_type": img_type, "loss_fn": "weighted_bce"
+        }
+    )
+
     # Training loop
     save_timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-    for epoch in range(1, epochs + 1):
-        model.train()
-        epoch_loss = 0
-        epoch_acc = 0
-        best_val_loss = np.inf
-        with tqdm.tqdm(total=epochs, desc=f"Epoch {epoch}/{epochs}") as pbar:
+    with tqdm.tqdm(total=epochs) as pbar:
+        for epoch in range(1, epochs + 1):
+            model.train()
+            epoch_loss = 0
+            epoch_acc = 0
+            best_val_loss = np.inf
             for epoch_idx, batch in enumerate(tqdm.tqdm(train_dataloader)):
                 image, label = batch[0].to(device), batch[1].to(device)  # use gpu
                 optimizer.zero_grad()
@@ -99,12 +102,13 @@ def main(FLAGS):
                 optimizer.step()
 
                 epoch_loss += loss.item()
-                epoch_acc += metric(output, label)
+                epoch_acc += metric(F.sigmoid(output), label)
             avg_epoch_loss = epoch_loss / (epoch_idx + 1)
             avg_epoch_acc = epoch_acc / (epoch_idx + 1)
             scheduler.step()
 
             # Validation step
+            model.eval()
             with torch.no_grad():
                 val_loss = 0
                 val_acc = 0
@@ -112,7 +116,7 @@ def main(FLAGS):
                     val_image, val_label = batch[0].to(device), batch[1].to(device)
                     val_output = model(val_image)
                     val_loss += loss_fn(val_output, val_label).item()
-                    val_acc += metric(val_output, val_label)
+                    val_acc += metric(F.sigmoid(val_output), val_label)
                 avg_val_loss = val_loss / (val_idx + 1)
                 avg_val_acc = val_acc / (val_idx + 1)
             
@@ -120,7 +124,7 @@ def main(FLAGS):
             if avg_val_loss < best_val_loss:
                 best_val_loss = avg_val_loss
                 torch.save(model.state_dict(), 
-                           f"TrainedModels/best_{img_type}_model_{save_timestamp}.pt")
+                            f"TrainedModels/best_{img_type}_model_{save_timestamp}.pt")
                 print("Best model saved!")
             
             experiment.log({
