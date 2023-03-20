@@ -48,7 +48,6 @@ class UNet(nn.Module):
 
         # Final 1x1 convolution and activation
         self.final_conv = nn.Conv2d(first_channels, n_classes, 1)
-        self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
         x1 = self.conv1(x)
@@ -68,7 +67,6 @@ class UNet(nn.Module):
         x = self.conv7(torch.cat([x1, x], 1))
 
         x = self.final_conv(x)
-        x = self.sigmoid(x)
         return x
 
 

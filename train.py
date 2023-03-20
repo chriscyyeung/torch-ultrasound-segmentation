@@ -8,6 +8,7 @@ import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ExponentialLR
+from torch.nn import BCEWithLogitsLoss
 from torchmetrics.classification import BinaryAccuracy
 
 from dataset import PICAIDataset, ToTensor
@@ -21,6 +22,7 @@ def get_parser():
     parser.add_argument("--val_img_dir", type=str, required=True)
     parser.add_argument("--mask_dir", type=str, required=True)
     parser.add_argument("--img_type", type=str, choices={"t2w", "hbv", "adc"}, required=True)
+    parser.add_argument("--preprocess", action="store_true")
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--lr", type=float, default=1e-3)
@@ -34,6 +36,7 @@ def main(FLAGS):
     print(f"Validation image directory: {(val_img_dir := FLAGS.val_img_dir)}")
     print(f"Mask directory:             {(mask_dir := FLAGS.mask_dir)}")
     print(f"Image type:                 {(img_type := FLAGS.img_type)}")
+    print(f"Preprocess:                 {(preprocess := FLAGS.preprocess)}")
     print(f"Epochs:                     {(epochs := FLAGS.epochs)}")
     print(f"Batch size:                 {(batch_size := FLAGS.batch_size)}")
     print(f"Learning rate:              {(lr := FLAGS.lr)}")
@@ -51,12 +54,14 @@ def main(FLAGS):
                                  mask_dir, 
                                  img_type, 
                                  transform=transform, 
-                                 target_transform=target_transform)
+                                 target_transform=target_transform,
+                                 preprocess=preprocess)
     val_dataset = PICAIDataset([val_img_dir], 
                                mask_dir, 
                                img_type, 
                                transform=transform, 
-                               target_transform=target_transform)
+                               target_transform=target_transform,
+                               preprocess=preprocess)
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_dataloader = DataLoader(val_dataset, batch_size=batch_size)
 
@@ -67,13 +72,14 @@ def main(FLAGS):
     experiment = wandb.init(
         project="cisc881-prostate-cancer-segmentation",
         config={
-            "epochs": epochs, "batch_size": batch_size, "lr": lr, "img_type": img_type
+            "epochs": epochs, "batch_size": batch_size, "lr": lr, "img_type": img_type, "loss_fn": "weighted_bce"
         }
     )
     # Training settings
     optimizer = Adam(model.parameters(), lr=lr)
     scheduler = ExponentialLR(optimizer, gamma=0.90)
-    loss_fn = DiceLoss()
+    # loss_fn = DiceLoss().cuda()
+    loss_fn = BCEWithLogitsLoss(pos_weight=torch.FloatTensor([9.])).cuda()
     metric = BinaryAccuracy().to(device)
 
     # Training loop

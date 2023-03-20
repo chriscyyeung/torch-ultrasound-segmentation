@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 class DiceLoss(nn.Module):
@@ -8,6 +9,8 @@ class DiceLoss(nn.Module):
         self.smooth = smooth
     
     def forward(self, y_pred, y_true):
+        y_pred = F.sigmoid(y_pred)
+
         # Flattened labels and predictions
         y_true_f = y_true.view(-1)
         y_pred_f = y_pred.view(-1)
