@@ -1,5 +1,6 @@
 import datetime
 import argparse
+import json
 import tqdm
 import torch
 import torchvision.transforms as transforms
@@ -31,6 +32,16 @@ def main(FLAGS):
     print(f"Model path:             {(model_path := FLAGS.model_path)}")
     print(f"Preprocess:             {(preprocess := FLAGS.preprocess)}")
     print(f"Batch size:             {(batch_size := FLAGS.batch_size)}")
+
+    # For saving test configuration
+    config = {
+        "date": datetime.datetime.now().strftime('%Y%m%d_%H%M%S'),
+        "test_img_dir": test_img_dir,
+        "mask_dir": mask_dir,
+        "img_type": img_type,
+        "model_path": model_path,
+        "batch_size": batch_size
+    }
 
     # Initialize dataset
     transform = transforms.Compose([ToTensor()], transforms.Normalize(0, 1))
@@ -67,10 +78,17 @@ def main(FLAGS):
             pbar.update(1)
             pbar.set_description(f"Accuracy: {test_acc / (i + 1)}, Dice: {test_dice / (i + 1)}")
 
-    print(f"Average test accuracy: {test_acc / len(test_dataloader)}")
-    print(f"Average test dice: {test_dice / len(test_dataloader)}")
+    avg_test_acc = test_acc / len(test_dataloader)
+    avg_test_dice = test_dice / len(test_dataloader)
+    print(f"Average test accuracy: {avg_test_acc}")
+    print(f"Average test dice: {avg_test_dice}")
 
     # Save results
+    config["accuracy"] = avg_test_acc
+    config["dice"] = avg_test_dice
+    json_string = json.dumps(config, indent=4)
+    with open("results.json", "a+") as f:
+        f.write(json_string)
 
 
 if __name__ == "__main__":
