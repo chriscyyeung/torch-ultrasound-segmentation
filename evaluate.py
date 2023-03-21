@@ -2,6 +2,7 @@ import datetime
 import argparse
 import json
 import tqdm
+import numpy as np
 import torch
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
@@ -18,6 +19,7 @@ def get_parser():
     parser.add_argument("--mask_dir", type=str, required=True)
     parser.add_argument("--img_type", type=str, choices={"t2w", "hbv", "adc"}, required=True)
     parser.add_argument("--model_path", type=str, required=True)
+    parser.add_argument("--save_json", type=str, default="results.json")
     parser.add_argument("--preprocess", action="store_true")
     parser.add_argument("--batch_size", type=int, default=32)
     return parser
@@ -26,10 +28,11 @@ def get_parser():
 def main(FLAGS):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    print(f"Test image directories: {(test_img_dir := FLAGS.train_img_dirs)}")
+    print(f"Test image directories: {(test_img_dir := FLAGS.test_img_dir)}")
     print(f"Mask directory:         {(mask_dir := FLAGS.mask_dir)}")
     print(f"Image type:             {(img_type := FLAGS.img_type)}")
     print(f"Model path:             {(model_path := FLAGS.model_path)}")
+    print(f"Results JSON filename:  {(save_json := FLAGS.save_json)}")
     print(f"Preprocess:             {(preprocess := FLAGS.preprocess)}")
     print(f"Batch size:             {(batch_size := FLAGS.batch_size)}")
 
@@ -44,7 +47,7 @@ def main(FLAGS):
     }
 
     # Initialize dataset
-    transform = transforms.Compose([ToTensor()], transforms.Normalize(0, 1))
+    transform = transforms.Compose([ToTensor(), transforms.Normalize(0, 1)])
     target_transform = transforms.Compose([ToTensor()])
     test_dataset = PICAIDataset([test_img_dir],
                                 mask_dir,
@@ -73,7 +76,7 @@ def main(FLAGS):
                 output = model(image)
                 output = torch.sigmoid(output)
                 test_acc += accuracy(output, label)
-                test_dice += dice(output, label)
+                test_dice += dice(output, label.long())
 
             pbar.update(1)
             pbar.set_description(f"Accuracy: {test_acc / (i + 1)}, Dice: {test_dice / (i + 1)}")
@@ -84,10 +87,10 @@ def main(FLAGS):
     print(f"Average test dice: {avg_test_dice}")
 
     # Save results
-    config["accuracy"] = avg_test_acc
-    config["dice"] = avg_test_dice
+    config["accuracy"] = avg_test_acc.item()
+    config["dice"] = avg_test_dice.item()
     json_string = json.dumps(config, indent=4)
-    with open("results.json", "a+") as f:
+    with open(save_json, "a+") as f:
         f.write(json_string)
 
 

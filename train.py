@@ -73,15 +73,15 @@ def main(FLAGS):
     # Training settings
     optimizer = Adam(model.parameters(), lr=lr)
     scheduler = ExponentialLR(optimizer, gamma=0.90)
-    # loss_fn = DiceLoss().cuda()
-    loss_fn = BCEWithLogitsLoss(pos_weight=torch.FloatTensor([9.])).cuda()
+    loss_fn = DiceLoss().cuda()
+    # loss_fn = BCEWithLogitsLoss(pos_weight=torch.FloatTensor([9.])).cuda()
     metric = BinaryAccuracy().to(device)
 
     # Initialize logger
     experiment = wandb.init(
         project="cisc881-prostate-cancer-segmentation",
         config={
-            "epochs": epochs, "batch_size": batch_size, "lr": lr, "img_type": img_type, "loss_fn": "weighted_bce"
+            "epochs": epochs, "batch_size": batch_size, "lr": lr, "img_type": img_type, "loss_fn": "dice"
         }
     )
 
