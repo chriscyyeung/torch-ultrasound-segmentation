@@ -50,13 +50,11 @@ def main(FLAGS):
     # Initialize datasets
     train_dataset = BUSDataset(train_img_dirs, 
                                  mask_dir, 
-                                 img_type, 
                                  transform=transform, 
                                  target_transform=target_transform,
                                  preprocess=preprocess)
     val_dataset = BUSDataset([val_img_dir], 
-                               mask_dir, 
-                               img_type, 
+                               mask_dir,  
                                transform=transform, 
                                target_transform=target_transform,
                                preprocess=preprocess)
@@ -78,7 +76,7 @@ def main(FLAGS):
     experiment = wandb.init(
         project="cisc881-prostate-cancer-segmentation",
         config={
-            "epochs": epochs, "batch_size": batch_size, "lr": lr, "img_type": img_type, "loss_fn": "dice"
+            "epochs": epochs, "batch_size": batch_size, "lr": lr, "loss_fn": "dice"
         }
     )
 

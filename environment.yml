@@ -14,5 +14,4 @@ dependencies:
   - tqdm
   - wandb
   - pip:
-    - pandas
     - torch-summary

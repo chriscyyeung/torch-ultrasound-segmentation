@@ -1,7 +1,4 @@
 import os
-import glob
-import re
-import tqdm
 import random
 import numpy as np
 import torch
@@ -12,7 +9,7 @@ from torchvision import transforms
 
 
 class BUSDataset(Dataset):
-    def __init__(self, img_dirs, mask_dir, transform=None, target_transform=None):
+    def __init__(self, imgs, masks, transform=None, target_transform=None):
         self.transform = transform
         self.target_transform = target_transform
     
