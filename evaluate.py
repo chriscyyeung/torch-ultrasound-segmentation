@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from torchmetrics.classification import BinaryAccuracy
 from torchmetrics.functional import dice
 
-from dataset import PICAIDataset, ToTensor
+from dataset import BUSDataset
 from Models.unet import UNet
 
 
@@ -17,7 +17,6 @@ def get_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--test_img_dir", type=str, required=True)
     parser.add_argument("--mask_dir", type=str, required=True)
-    parser.add_argument("--img_type", type=str, choices={"t2w", "hbv", "adc"}, required=True)
     parser.add_argument("--model_path", type=str, required=True)
     parser.add_argument("--save_json", type=str, default="results.json")
     parser.add_argument("--preprocess", action="store_true")
@@ -30,7 +29,6 @@ def main(FLAGS):
 
     print(f"Test image directories: {(test_img_dir := FLAGS.test_img_dir)}")
     print(f"Mask directory:         {(mask_dir := FLAGS.mask_dir)}")
-    print(f"Image type:             {(img_type := FLAGS.img_type)}")
     print(f"Model path:             {(model_path := FLAGS.model_path)}")
     print(f"Results JSON filename:  {(save_json := FLAGS.save_json)}")
     print(f"Preprocess:             {(preprocess := FLAGS.preprocess)}")
@@ -41,17 +39,15 @@ def main(FLAGS):
         "date": datetime.datetime.now().strftime('%Y%m%d_%H%M%S'),
         "test_img_dir": test_img_dir,
         "mask_dir": mask_dir,
-        "img_type": img_type,
         "model_path": model_path,
         "batch_size": batch_size
     }
 
-    # Initialize dataset
-    transform = transforms.Compose([ToTensor(), transforms.Normalize(0, 1)])
-    target_transform = transforms.Compose([ToTensor()])
-    test_dataset = PICAIDataset([test_img_dir],
+    # TODO: Initialize dataset
+    transform = transforms.Compose([transforms.Normalize(0, 1)])
+    target_transform = transforms.Compose([])
+    test_dataset = BUSDataset([test_img_dir],
                                 mask_dir,
-                                img_type,
                                 transform=transform,
                                 target_transform=target_transform,
                                 preprocess=preprocess)

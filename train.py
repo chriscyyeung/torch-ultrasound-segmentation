@@ -12,7 +12,7 @@ from torch.optim.lr_scheduler import ExponentialLR
 from torch.nn import BCEWithLogitsLoss
 from torchmetrics.classification import BinaryAccuracy
 
-from dataset import PICAIDataset, ToTensor
+from dataset import BUSDataset
 from loss import DiceLoss
 from Models.unet import UNet
 
@@ -22,7 +22,6 @@ def get_parser():
     parser.add_argument("--train_img_dirs", type=str, nargs="+", required=True)
     parser.add_argument("--val_img_dir", type=str, required=True)
     parser.add_argument("--mask_dir", type=str, required=True)
-    parser.add_argument("--img_type", type=str, choices={"t2w", "hbv", "adc"}, required=True)
     parser.add_argument("--preprocess", action="store_true")
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--batch_size", type=int, default=32)
@@ -36,28 +35,26 @@ def main(FLAGS):
     print(f"Training image directories: {(train_img_dirs := FLAGS.train_img_dirs)}")
     print(f"Validation image directory: {(val_img_dir := FLAGS.val_img_dir)}")
     print(f"Mask directory:             {(mask_dir := FLAGS.mask_dir)}")
-    print(f"Image type:                 {(img_type := FLAGS.img_type)}")
     print(f"Preprocess:                 {(preprocess := FLAGS.preprocess)}")
     print(f"Epochs:                     {(epochs := FLAGS.epochs)}")
     print(f"Batch size:                 {(batch_size := FLAGS.batch_size)}")
     print(f"Learning rate:              {(lr := FLAGS.lr)}")
 
-    # Initialize transforms
+    # TODO: Initialize transforms
     transform = transforms.Compose([ToTensor(), 
-                                    transforms.RandomHorizontalFlip(0.5),
-                                    transforms.Normalize(0, 1)])
+                                    transforms.RandomHorizontalFlip(0.5)])
     
     target_transform = transforms.Compose([ToTensor(),
                                            transforms.RandomHorizontalFlip(0.5)])
 
     # Initialize datasets
-    train_dataset = PICAIDataset(train_img_dirs, 
+    train_dataset = BUSDataset(train_img_dirs, 
                                  mask_dir, 
                                  img_type, 
                                  transform=transform, 
                                  target_transform=target_transform,
                                  preprocess=preprocess)
-    val_dataset = PICAIDataset([val_img_dir], 
+    val_dataset = BUSDataset([val_img_dir], 
                                mask_dir, 
                                img_type, 
                                transform=transform, 
