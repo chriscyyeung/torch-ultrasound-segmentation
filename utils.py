@@ -77,9 +77,9 @@ def load_ultrasound_data(data_arrays_fullpath):
     return ultrasound_arrays_by_subjects, segmentation_arrays_by_subjects
 
 
-    def list_images_by_subject(ultrasound_arrays_by_subjects):
-        for i in range(len(ultrasound_arrays_by_subjects)):
-            print("Subject {}: {} images".format(i, ultrasound_arrays_by_subjects[i].shape[0]))
+def list_images_by_subject(ultrasound_arrays_by_subjects):
+    for i in range(len(ultrasound_arrays_by_subjects)):
+        print("Subject {}: {} images".format(i, ultrasound_arrays_by_subjects[i].shape[0]))
 
 
 if __name__ == "__main__":
