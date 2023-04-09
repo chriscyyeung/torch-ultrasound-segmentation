@@ -40,13 +40,6 @@ def get_parser():
         type=float, 
         default=1e-3
     )
-    parser.add_argument(
-        "--train_split", 
-        type=float,  
-        default=0.8,
-        choices=range(0,1), 
-        metavar="[0-1]"
-    )
     return parser
 
 
@@ -64,12 +57,6 @@ def main(FLAGS):
 
     # Load images and masks
     ultrasound_arrays, segmentation_arrays = load_ultrasound_data(data_arrays_fullpath)
-
-    # Split data into training, validation, and test sets (by patient)
-    val_test_splits = (1 - FLAGS.train_split) / 2
-    train_indices, val_indices, test_indices \
-        = get_train_test_val_indices(ultrasound_arrays, FLAGS.train_split, val_test_splits, val_test_splits)
-    
 
     # TODO: Initialize transforms
     transform = transforms.Compose([ToTensor(), 
