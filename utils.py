@@ -37,7 +37,7 @@ def create_standard_project_folders(local_data_folder):
 def load_ultrasound_data(data_arrays_fullpath):
     ultrasound_filenames = glob.glob(os.path.join(data_arrays_fullpath, "ultrasound*.npy"))
     segmentation_filenames = glob.glob(os.path.join(data_arrays_fullpath, "segmentation*.npy"))
-    subject_ids = set([int(os.path.splitext(os.path.basename(fn)).split("-")[2]) for fn in ultrasound_filenames])
+    subject_ids = set([int(os.path.splitext(os.path.basename(fn))[0].split("-")[1]) for fn in ultrasound_filenames])
     n_arrays = len(subject_ids)
 
     # Load arrays from local files
@@ -74,3 +74,10 @@ def load_ultrasound_data(data_arrays_fullpath):
         segmentation_arrays_by_subjects.append(subject_segmentation_array)
 
     return ultrasound_arrays_by_subjects, segmentation_arrays_by_subjects
+
+
+if __name__ == "__main__":
+    project_path = "e:/PerkLab/Data/BreastSurgery/BreastUltrasound"
+    us_arrays, seg_arrays = load_ultrasound_data(os.path.join(project_path, "DataArrays"))
+    print(len(us_arrays), len(seg_arrays))
+    print(us_arrays[0].shape, seg_arrays[0].shape)
