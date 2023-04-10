@@ -43,6 +43,8 @@ def main(FLAGS):
         "batch_size": batch_size
     }
 
+    test_img_idx = list(range(28, 33))
+
     # TODO: Initialize dataset
     transform = transforms.Compose([transforms.Normalize(0, 1)])
     target_transform = transforms.Compose([])

@@ -12,7 +12,7 @@ from torch.optim.lr_scheduler import ExponentialLR
 from torch.nn import BCEWithLogitsLoss
 from torchmetrics.classification import BinaryAccuracy
 
-from dataset import BUSDataset
+from dataset import *
 from loss import DiceLoss
 from Models.unet import UNet
 from utils import *
@@ -46,7 +46,7 @@ def get_parser():
 def main(FLAGS):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    print(f"Project folder: {(project_dir := FLAGS.train_img_dirs)}")
+    print(f"Project folder: {(project_dir := FLAGS.project_dir)}")
     print(f"Epochs:         {(epochs := FLAGS.epochs)}")
     print(f"Batch size:     {(batch_size := FLAGS.batch_size)}")
     print(f"Learning rate:  {(lr := FLAGS.lr)}")
@@ -56,28 +56,53 @@ def main(FLAGS):
         = create_standard_project_folders(project_dir)
 
     # Load images and masks
+    train_img_idx = list(range(0, 24))
+    val_img_idx = list(range(24, 28))
     ultrasound_arrays, segmentation_arrays = load_ultrasound_data(data_arrays_fullpath)
+    train_ultrasounds = get_data_array(ultrasound_arrays, train_img_idx)
+    train_segmentations = get_data_array(segmentation_arrays, train_img_idx)
+    val_ultrasounds = get_data_array(ultrasound_arrays, val_img_idx)
+    val_segmentations = get_data_array(segmentation_arrays, val_img_idx)
 
-    # TODO: Initialize transforms
-    transform = transforms.Compose([ToTensor(), 
-                                    transforms.RandomHorizontalFlip(0.5)])
-    
-    target_transform = transforms.Compose([ToTensor(),
-                                           transforms.RandomHorizontalFlip(0.5)])
+    # Initialize transforms
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
+    target_transform = transforms.ToTensor()
+    joint_transform = Compose([
+        ToPILImage(),
+        FreeScale((256, 256)),
+        RandomHorizontalFlip(),
+        RandomRotate(10)
+    ])
+    val_transform = transforms.Compose([
+        transforms.Resize((256, 256)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
+    val_target_transform = transforms.Compose([
+        transforms.Resize((256, 256)),
+        transforms.ToTensor()
+    ])
 
     # Initialize datasets
-    train_dataset = BUSDataset(train_img_dirs, 
-                                 mask_dir, 
-                                 transform=transform, 
-                                 target_transform=target_transform,
-                                 preprocess=preprocess)
-    val_dataset = BUSDataset([val_img_dir], 
-                               mask_dir,  
-                               transform=transform, 
-                               target_transform=target_transform,
-                               preprocess=preprocess)
+    train_dataset = BUSDataset(
+        train_ultrasounds, 
+        train_segmentations, 
+        transform=transform, 
+        target_transform=target_transform,
+        joint_transform=joint_transform
+    )
+    val_dataset = BUSDataset(
+        val_ultrasounds, 
+        val_segmentations,
+        transform=val_transform,
+        target_transform=val_target_transform
+    )
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_dataloader = DataLoader(val_dataset, batch_size=batch_size)
+    print(next(iter(train_dataloader))[0].shape)
 
     # Initialize model
     model = UNet(1, 64, 1)
@@ -91,12 +116,12 @@ def main(FLAGS):
     metric = BinaryAccuracy().to(device)
 
     # Initialize logger
-    experiment = wandb.init(
-        project="cisc881-prostate-cancer-segmentation",
-        config={
-            "epochs": epochs, "batch_size": batch_size, "lr": lr, "loss_fn": "dice"
-        }
-    )
+    # experiment = wandb.init(
+    #     project="",
+    #     config={
+    #         "epochs": epochs, "batch_size": batch_size, "lr": lr, "loss_fn": "dice"
+    #     }
+    # )
 
     # Training loop
     save_timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
