@@ -14,7 +14,7 @@ from torchmetrics.classification import BinaryAccuracy
 
 from dataset import *
 from loss import DiceLoss
-from Models.unet import UNet
+from Models.ggnet import GGNet
 from utils import *
 
 
@@ -105,7 +105,7 @@ def main(FLAGS):
     print(next(iter(train_dataloader))[0].shape)
 
     # Initialize model
-    model = UNet(1, 64, 1)
+    model = GGNet()
     model.to(device)
 
     # Training settings
