@@ -3,7 +3,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision.models import resnext101_32x8d, ResNeXt101_32X8D_Weights
+from torchvision.models import efficientnet_b0, EfficientNet_B0_Weights
 
 
 class GGNet(nn.Module):
@@ -13,7 +13,7 @@ class GGNet(nn.Module):
         self.backbone = Encoder()
         self.aspp = ASPP()
         self.decoder = Decoder(num_classes)
-        self.predict5 = nn.Conv2d(256, 1, kernel_size=1)
+        self.predict5 = nn.Conv2d(128, 1, kernel_size=1)
         self.pool = nn.MaxPool2d(3, stride=1, padding=1)
 
         if freeze_bn:
@@ -38,48 +38,39 @@ class GGNet(nn.Module):
                 m.eval()
 
 
-# Backbone
 class Encoder(nn.Module):
     def __init__(self):
         super().__init__()
 
-        self.resnext = ResNext101()
+        self.efficientnet = EfficientNetB0()
 
-        self.down0 = nn.Sequential(
-            nn.Conv2d(64, 128, kernel_size=1), nn.BatchNorm2d(128), nn.PReLU()
-        )
-        self.down3 = nn.Sequential(
-            nn.Conv2d(1024, 128, kernel_size=1), nn.BatchNorm2d(128), nn.PReLU()
-        )
-        self.down2 = nn.Sequential(
-            nn.Conv2d(512, 128, kernel_size=1), nn.BatchNorm2d(128), nn.PReLU()
-        )
-        self.down1 = nn.Sequential(
-            nn.Conv2d(256, 128, kernel_size=1), nn.BatchNorm2d(128), nn.PReLU()
-        )
+        self.down0 = nn.Sequential(nn.Conv2d(32, 64, kernel_size=1), nn.BatchNorm2d(64), nn.PReLU())
+        self.down3 = nn.Sequential(nn.Conv2d(192, 64, kernel_size=1), nn.BatchNorm2d(64), nn.PReLU())
+        self.down2 = nn.Sequential(nn.Conv2d(80, 64, kernel_size=1), nn.BatchNorm2d(64), nn.PReLU())
+        self.down1 = nn.Sequential(nn.Conv2d(24, 64, kernel_size=1), nn.BatchNorm2d(64), nn.PReLU())
 
         self.fuse1 = nn.Sequential(
-            nn.Conv2d(512, 256, kernel_size=3, padding=1), nn.BatchNorm2d(256), nn.PReLU(),
-            nn.Conv2d(256, 256, kernel_size=3, padding=1), nn.BatchNorm2d(256), nn.PReLU(),
-            nn.Conv2d(256, 256, kernel_size=1), nn.BatchNorm2d(256), nn.PReLU()
+            nn.Conv2d(256, 128, kernel_size=3, padding=1), nn.BatchNorm2d(128), nn.PReLU(),
+            nn.Conv2d(128, 128, kernel_size=3, padding=1), nn.BatchNorm2d(128), nn.PReLU(),
+            nn.Conv2d(128, 128, kernel_size=1), nn.BatchNorm2d(128), nn.PReLU()
         )
 
-        self.predict0 = nn.Conv2d(128, 1, kernel_size=1)
-        self.predict3 = nn.Conv2d(128, 1, kernel_size=1)
-        self.predict2 = nn.Conv2d(128, 1, kernel_size=1)
-        self.predict1 = nn.Conv2d(128, 1, kernel_size=1)
+        self.predict0 = nn.Conv2d(64, 1, kernel_size=1)
+        self.predict3 = nn.Conv2d(64, 1, kernel_size=1)
+        self.predict2 = nn.Conv2d(64, 1, kernel_size=1)
+        self.predict1 = nn.Conv2d(64, 1, kernel_size=1)
         self.sigmoid = nn.Sigmoid()
-        self.pool = nn.MaxPool2d(3,stride=1,padding=1)
-
+        self.pool = nn.MaxPool2d(3, stride=1, padding=1)
+    
     def forward(self, x):
-        layer0 = self.resnext.layer0(x)
-        layer1 = self.resnext.layer1(layer0)
-        layer2 = self.resnext.layer2(layer1)
-        layer3 = self.resnext.layer3(layer2)
+        layer0 = self.efficientnet.layer0(x)
+        layer1 = self.efficientnet.layer1(layer0)
+        layer2 = self.efficientnet.layer2(layer1)
+        layer3 = self.efficientnet.layer3(layer2)
 
-        down0 = F.interpolate(self.down0(layer0), size=layer1.size()[2:], mode='bilinear',align_corners=True)
-        down3 = F.interpolate(self.down3(layer3), size=layer1.size()[2:], mode='bilinear',align_corners=True)
-        down2 = F.interpolate(self.down2(layer2), size=layer1.size()[2:], mode='bilinear',align_corners=True)
+        down0 = F.interpolate(self.down0(layer0), size=layer1.size()[2:], mode='bilinear', align_corners=True)
+        down3 = F.interpolate(self.down3(layer3), size=layer1.size()[2:], mode='bilinear', align_corners=True)
+        down2 = F.interpolate(self.down2(layer2), size=layer1.size()[2:], mode='bilinear', align_corners=True)
         down1 = self.down1(layer1)
 
         predict0 = self.predict0(down0)
@@ -117,26 +108,27 @@ class Encoder(nn.Module):
         return layer3, layer1, fuse1, o1_e, o2_e, o3_e, o0_e
 
 
-# Pretrained ResNext101
-class ResNext101(nn.Module):
+# Backbone
+class EfficientNetB0(nn.Module):
     def __init__(self):
         super().__init__()
 
-        net = resnext101_32x8d(weights=ResNeXt101_32X8D_Weights.IMAGENET1K_V2)
-        net = list(net.children())
-        self.layer0 = nn.Sequential(*net[:3])
-        self.layer1 = nn.Sequential(*net[3:5])
-        self.layer2 = net[5]
-        self.layer3 = net[6]
-        self.layer4 = net[7]
-    
+        net = efficientnet_b0(weights=EfficientNet_B0_Weights.IMAGENET1K_V1)
+        net = list(net.children())[0]
+
+        self.layer0 = net[0]
+        self.layer1 = nn.Sequential(*net[1:3])
+        self.layer2 = nn.Sequential(*net[3:5])
+        self.layer3 = nn.Sequential(*net[5:7])
+        self.layer4 = nn.Sequential(*net[7:])
+
     def forward(self, x):
-        x = self.layer0(x)
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
-        return x
+        layer0 = self.layer0(x)
+        layer1 = self.layer1(layer0)
+        layer2 = self.layer2(layer1)
+        layer3 = self.layer3(layer2)
+        layer4 = self.layer4(layer3)
+        return layer4
 
 
 # Atrous spatial pyramid pooling
@@ -145,17 +137,17 @@ class ASPP(nn.Module):
         super().__init__()
 
         dilations = [1, 6, 12, 18]
-        self.aspp1 = _ASPPModule(1024, 256, 1, padding=0, dilation=dilations[0])
-        self.aspp2 = _ASPPModule(1024, 256, 3, padding=dilations[1], dilation=dilations[1])
-        self.aspp3 = _ASPPModule(1024, 256, 3, padding=dilations[2], dilation=dilations[2])
-        self.aspp4 = _ASPPModule(1024, 256, 3, padding=dilations[3], dilation=dilations[3])
+        self.aspp1 = _ASPPModule(192, 64, 1, padding=0, dilation=dilations[0])
+        self.aspp2 = _ASPPModule(192, 64, 3, padding=dilations[1], dilation=dilations[1])
+        self.aspp3 = _ASPPModule(192, 64, 3, padding=dilations[2], dilation=dilations[2])
+        self.aspp4 = _ASPPModule(192, 64, 3, padding=dilations[3], dilation=dilations[3])
 
         self.global_avg_pool = nn.Sequential(nn.AdaptiveAvgPool2d((1, 1)),
-                                             nn.Conv2d(1024, 256, 1, stride=1, bias=False),
-                                             nn.BatchNorm2d(256),
+                                             nn.Conv2d(192, 64, 1, stride=1, bias=False),
+                                             nn.BatchNorm2d(64),
                                              nn.ReLU())
-        self.conv1 = nn.Conv2d(1280, 256, 1, bias=False)
-        self.bn1 = nn.BatchNorm2d(256)
+        self.conv1 = nn.Conv2d(320, 128, 1, bias=False)
+        self.bn1 = nn.BatchNorm2d(128)
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(0.5)
 
@@ -214,25 +206,25 @@ class Decoder(nn.Module):
     def __init__(self, num_classes):
         super().__init__()
 
-        low_level_inplanes = 256
-        self.conv1 = nn.Conv2d(256, 256, 1, bias=False)
-        self.bn1 = nn.BatchNorm2d(256)
+        low_level_inplanes = 24
+        self.conv1 = nn.Conv2d(128, 128, 1, bias=False)
+        self.bn1 = nn.BatchNorm2d(128)
         self.relu = nn.ReLU()
         self.conv2 = nn.Conv2d(low_level_inplanes, 48, 1, bias=False)
         self.bn2 = nn.BatchNorm2d(48)
         self.relu = nn.ReLU()
         
-        self.last_conv = nn.Sequential(nn.Conv2d(304, 256, kernel_size=3, stride=1, padding=1, bias=False),
-                                       nn.BatchNorm2d(256),
+        self.last_conv = nn.Sequential(nn.Conv2d(176, 128, kernel_size=3, stride=1, padding=1, bias=False),
+                                       nn.BatchNorm2d(128),
                                        nn.ReLU(),
                                        nn.Dropout(0.5),
-                                       nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1, bias=False),
-                                       nn.BatchNorm2d(256),
+                                       nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1, bias=False),
+                                       nn.BatchNorm2d(128),
                                        nn.ReLU(),
                                        nn.Dropout(0.1),
-                                       nn.Conv2d(256, num_classes, kernel_size=1, stride=1))
+                                       nn.Conv2d(128, num_classes, kernel_size=1, stride=1))
 
-        self.dg = DGNLB(256, 256)
+        self.dg = DGNLB(128, 128)
    
         self._init_weight()
 
@@ -296,7 +288,6 @@ class G_PAM_Module(nn.Module):
         
         self.query_guide = nn.Conv2d(in_channels=in_dim_guide, out_channels=in_dim_guide, kernel_size=1)
         self.key_guide = nn.Conv2d(in_channels=in_dim_guide, out_channels=in_dim_guide, kernel_size=1)
-        # self.value_guide=Conv2d(in_channels=in_dim, out_channels=in_dim, kernel_size=1)
 
         self.query_conv = nn.Conv2d(in_channels=in_dim, out_channels=in_dim, kernel_size=1)
         self.key_conv = nn.Conv2d(in_channels=in_dim, out_channels=in_dim, kernel_size=1)
@@ -305,7 +296,7 @@ class G_PAM_Module(nn.Module):
 
         self.softmax = nn.Softmax(dim=-1)
     
-    def forward(self, x,g):
+    def forward(self, x, g):
         """
             inputs :
                 x : input feature maps( B X C X H X W)
@@ -381,7 +372,10 @@ class G_CAM_Module(nn.Module):
 
 
 if __name__ == "__main__":
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     net = GGNet()
+    net.to(device)
     # print(net)
     x = torch.randn(32, 3, 256, 256)
+    x = x.to(device)
     net(x)
