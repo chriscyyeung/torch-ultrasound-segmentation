@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-from torchsummary import summary
 
 
 class ConvBlock(nn.Module):
@@ -34,17 +33,21 @@ class UNet(nn.Module):
         self.down2 = nn.MaxPool2d(2)
         self.conv3 = ConvBlock(first_channels * 2, first_channels * 4, n_stages=2)
         self.down3 = nn.MaxPool2d(2)
+        self.conv4 = ConvBlock(first_channels * 4, first_channels * 8, n_stages=2)
+        self.down4 = nn.MaxPool2d(2)
 
         # Bottleneck
-        self.conv4 = ConvBlock(first_channels * 4, first_channels * 8, n_stages=2)
+        self.conv5 = ConvBlock(first_channels * 8, first_channels * 16, n_stages=2)
 
         # Decoder (output_padding=1 for odd-sized inputs)
-        self.up1 = nn.ConvTranspose2d(first_channels * 8, first_channels * 4, 2, stride=2, output_padding=1)
-        self.conv5 = ConvBlock(first_channels * 8, first_channels * 4, n_stages=2)
-        self.up2 = nn.ConvTranspose2d(first_channels * 4, first_channels * 2, 2, stride=2)
-        self.conv6 = ConvBlock(first_channels * 4, first_channels * 2, n_stages=2)
-        self.up3 = nn.ConvTranspose2d(first_channels * 2, first_channels, 2, stride=2)
-        self.conv7 = ConvBlock(first_channels * 2, first_channels, n_stages=2)
+        self.up1 = nn.ConvTranspose2d(first_channels * 16, first_channels * 8, 2, stride=2)
+        self.conv6 = ConvBlock(first_channels * 16, first_channels * 8, n_stages=2)
+        self.up2 = nn.ConvTranspose2d(first_channels * 8, first_channels * 4, 2, stride=2)
+        self.conv7 = ConvBlock(first_channels * 8, first_channels * 4, n_stages=2)
+        self.up3 = nn.ConvTranspose2d(first_channels * 4, first_channels * 2, 2, stride=2)
+        self.conv8 = ConvBlock(first_channels * 4, first_channels * 2, n_stages=2)
+        self.up4 = nn.ConvTranspose2d(first_channels * 2, first_channels, 2, stride=2)
+        self.conv9 = ConvBlock(first_channels * 2, first_channels, n_stages=2)
 
         # Final 1x1 convolution and activation
         self.final_conv = nn.Conv2d(first_channels, n_classes, 1)
@@ -56,20 +59,25 @@ class UNet(nn.Module):
         d2 = self.down2(x2)
         x3 = self.conv3(d2)
         d3 = self.down3(x3)
+        x4 = self.conv4(d3)
+        d4 = self.down4(x4)
 
-        x = self.conv4(d3)
+        x = self.conv5(d4)
 
         x = self.up1(x)
-        x = self.conv5(torch.cat([x3, x], 1))
+        x = self.conv6(torch.cat([x4, x], 1))
         x = self.up2(x)
-        x = self.conv6(torch.cat([x2, x], 1))
+        x = self.conv7(torch.cat([x3, x], 1))
         x = self.up3(x)
-        x = self.conv7(torch.cat([x1, x], 1))
+        x = self.conv8(torch.cat([x2, x], 1))
+        x = self.up4(x)
+        x = self.conv9(torch.cat([x1, x], 1))
 
         x = self.final_conv(x)
         return x
 
 
 if __name__ == '__main__':
-    model = UNet(1, 64, 1)
-    summary(model, (1, 300, 300))
+    model = UNet(3, 64, 1)
+    x = torch.randn(8, 3, 256, 256)
+    model(x)

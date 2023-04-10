@@ -12,5 +12,3 @@ dependencies:
   - torchmetrics
   - tqdm
   - wandb
-  - pip:
-    - torch-summary

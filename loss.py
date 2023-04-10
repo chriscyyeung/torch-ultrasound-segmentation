@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch import einsum
 
 
 class DiceLoss(nn.Module):
@@ -21,8 +22,23 @@ class DiceLoss(nn.Module):
         return 1 - dice
 
 
+# Adapted from https://github.com/LIVIAETS/boundary-loss
+class BoundaryLoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+    
+    def forward(self, y_pred, y_true):
+        y_pred = F.sigmoid(y_pred)
+
+        multiplied = einsum("bkwh,bkwh->bkwh", y_pred, y_true)
+        loss = multiplied.mean()
+
+        return loss
+
+
 if __name__ == "__main__":
-    true = torch.ones((1, 300, 300))
-    pred = torch.zeros((1, 300, 300))
+    true = torch.ones((32, 1, 300, 300))
+    pred = torch.zeros((32, 1, 300, 300))
     loss = DiceLoss()
+    # loss = BoundaryLoss()
     print(loss(pred, true))

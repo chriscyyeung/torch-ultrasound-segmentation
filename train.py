@@ -7,13 +7,12 @@ import torch
 import torchvision.transforms as transforms
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
-from torch.optim import Adam
-from torch.optim.lr_scheduler import ExponentialLR
-from torch.nn import BCEWithLogitsLoss
+from torch.optim import SGD
 from torchmetrics.classification import BinaryAccuracy
 
 from dataset import *
-from loss import DiceLoss
+from loss import *
+from Models.unet import UNet
 from Models.ggnet import GGNet
 from utils import *
 
@@ -24,6 +23,18 @@ def get_parser():
         "--project_dir", 
         type=str, 
         required=True
+    )
+    parser.add_argument(
+        "--model", 
+        type=str,
+        default="unet",
+        choices=["unet", "ggnet"]
+    )
+    parser.add_argument(
+        "--loss_fn",
+        type=str,
+        default="dice",
+        choices=["dice", "boundary"]
     )
     parser.add_argument(
         "--epochs", 
@@ -45,8 +56,11 @@ def get_parser():
 
 def main(FLAGS):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    # device = torch.device("cpu")
 
     print(f"Project folder: {(project_dir := FLAGS.project_dir)}")
+    print(f"Model:          {(model_str := FLAGS.model)}")
+    print(f"Loss function:  {(loss_fn_str := FLAGS.loss_fn)}")
     print(f"Epochs:         {(epochs := FLAGS.epochs)}")
     print(f"Batch size:     {(batch_size := FLAGS.batch_size)}")
     print(f"Learning rate:  {(lr := FLAGS.lr)}")
@@ -69,7 +83,7 @@ def main(FLAGS):
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
-    target_transform = transforms.ToTensor()
+    target_transform = transforms.Compose([ToTensor()])
     joint_transform = Compose([
         ToPILImage(),
         FreeScale((256, 256)),
@@ -77,14 +91,14 @@ def main(FLAGS):
         RandomRotate(10)
     ])
     val_transform = transforms.Compose([
-        transforms.Resize((256, 256)),
         transforms.ToTensor(),
+        transforms.Resize((256, 256), antialias=True),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
     val_target_transform = transforms.Compose([
-        transforms.Resize((256, 256)),
-        transforms.ToTensor()
-    ])
+        ToTensor(),
+        transforms.Resize((256, 256), antialias=True)])
+    val_joint_transform = Compose([ToPILImage()])
 
     # Initialize datasets
     train_dataset = BUSDataset(
@@ -98,83 +112,124 @@ def main(FLAGS):
         val_ultrasounds, 
         val_segmentations,
         transform=val_transform,
-        target_transform=val_target_transform
+        target_transform=val_target_transform,
+        joint_transform=val_joint_transform
     )
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_dataloader = DataLoader(val_dataset, batch_size=batch_size)
-    print(next(iter(train_dataloader))[0].shape)
 
     # Initialize model
-    model = GGNet()
+    if model_str == "unet":
+        model = UNet(3, 64, 1)
+    elif model_str == "ggnet":
+        model = GGNet()
+    else:
+        raise NotImplementedError
     model.to(device)
 
     # Training settings
-    optimizer = Adam(model.parameters(), lr=lr)
-    scheduler = ExponentialLR(optimizer, gamma=0.90)
-    loss_fn = DiceLoss().cuda()
-    # loss_fn = BCEWithLogitsLoss(pos_weight=torch.FloatTensor([9.])).cuda()
+    optimizer = SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=1e-4)
+    if loss_fn_str == "dice":
+        loss_fn = DiceLoss().cuda()
+    elif loss_fn_str == "boundary":
+        loss_fn = BoundaryLoss().cuda()
+    else:
+        raise NotImplementedError
     metric = BinaryAccuracy().to(device)
 
     # Initialize logger
-    # experiment = wandb.init(
-    #     project="",
-    #     config={
-    #         "epochs": epochs, "batch_size": batch_size, "lr": lr, "loss_fn": "dice"
-    #     }
-    # )
+    experiment = wandb.init(
+        project="cisc881-breast-ultrasound-segmentation",
+        config={
+            "model": model_str, "loss_fn": loss_fn_str, "epochs": epochs, "batch_size": batch_size, "lr": lr
+        }
+    )
 
     # Training loop
     save_timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-    with tqdm.tqdm(total=epochs) as pbar:
-        for epoch in range(1, epochs + 1):
-            model.train()
-            epoch_loss = 0
-            epoch_acc = 0
-            best_val_loss = np.inf
-            for epoch_idx, batch in enumerate(tqdm.tqdm(train_dataloader)):
+    for epoch in tqdm.tqdm(range(1, epochs + 1)):
+        model.train()
+        epoch_loss = 0
+        epoch_acc = 0
+        best_val_loss = np.inf
+        with tqdm.tqdm(total=len(train_dataloader)) as pbar:
+            for epoch_idx, batch in enumerate(train_dataloader):
                 image, label = batch[0].to(device), batch[1].to(device)  # use gpu
                 optimizer.zero_grad()
-                output = model(image)
-                loss = loss_fn(output, label)
+
+                if model_str == "unet":
+                    output = model(image)
+                    loss = loss_fn(output, label)
+                    acc = metric(F.sigmoid(output), label)
+
+                elif model_str == "ggnet":
+                    o0, o1, o2, o3, o4, o5 = model(image)
+
+                    loss0 = loss_fn(o0, label)
+                    loss1 = loss_fn(o1, label)
+                    loss2 = loss_fn(o2, label)
+                    loss3 = loss_fn(o3, label)
+                    loss4 = loss_fn(o4, label)
+                    loss5 = loss_fn(o5, label)
+
+                    loss = loss0 + loss1 + loss2 + loss3 + loss4 + loss5
+                    acc = metric(F.sigmoid(o0), label)
+
                 loss.backward()
                 optimizer.step()
 
                 epoch_loss += loss.item()
-                epoch_acc += metric(F.sigmoid(output), label)
-            avg_epoch_loss = epoch_loss / (epoch_idx + 1)
-            avg_epoch_acc = epoch_acc / (epoch_idx + 1)
-            scheduler.step()
+                epoch_acc += acc
 
-            # Validation step
-            model.eval()
-            with torch.no_grad():
-                val_loss = 0
-                val_acc = 0
-                for val_idx, batch in enumerate(tqdm.tqdm(val_dataloader)):
+                pbar.update(1)
+                pbar.set_description(f"loss: {loss.item():.4f}, acc: {acc:.4f}")
+
+        avg_epoch_loss = epoch_loss / (epoch_idx + 1)
+        avg_epoch_acc = epoch_acc / (epoch_idx + 1)
+
+        # Validation step
+        model.eval()
+        with torch.no_grad():
+            val_loss = 0
+            val_acc = 0
+            with tqdm.tqdm(total=len(val_dataloader)) as pbar:
+                for val_idx, batch in enumerate(val_dataloader):
                     val_image, val_label = batch[0].to(device), batch[1].to(device)
-                    val_output = model(val_image)
-                    val_loss += loss_fn(val_output, val_label).item()
-                    val_acc += metric(F.sigmoid(val_output), val_label)
-                avg_val_loss = val_loss / (val_idx + 1)
-                avg_val_acc = val_acc / (val_idx + 1)
-            
-            # Save best model
-            if avg_val_loss < best_val_loss:
-                best_val_loss = avg_val_loss
-                torch.save(model.state_dict(), 
-                            f"TrainedModels/best_{img_type}_model_{save_timestamp}.pt")
-                print("Best model saved!")
-            
-            experiment.log({
-                "epoch": epoch,
-                "lr": optimizer.param_groups[0]["lr"],
-                "train_loss": avg_epoch_loss,
-                "val_loss": avg_val_loss,
-                "train_acc": avg_epoch_acc,
-                "val_acc": avg_val_acc
-            })
-            pbar.update(1)
-            pbar.set_description(f"Epoch {epoch}/{epochs}, Epoch Loss: {avg_epoch_loss:.4f}, Val Loss: {avg_val_loss:.4f}")
+
+                    if model_str == "unet":
+                        val_output = model(val_image)
+                        val_loss = loss_fn(val_output, val_label)
+                        val_acc = metric(F.sigmoid(val_output), val_label)
+                    
+                    elif model_str == "ggnet":
+                        val_o0, val_o1, val_o2, val_o3, val_o4, val_o5 = model(val_image)
+                        val_loss = loss_fn(val_o0, val_label)
+                        val_acc = metric(F.sigmoid(val_o0), val_label)
+                    
+                    val_loss += val_loss.item()
+                    val_acc += val_acc
+
+                    pbar.update(1)
+                    pbar.set_description(f"loss: {val_loss.item():.4f}, acc: {val_acc:.4f}")
+                    
+            avg_val_loss = val_loss / (val_idx + 1)
+            avg_val_acc = val_acc / (val_idx + 1)
+        
+        # Save best model
+        if avg_val_loss < best_val_loss:
+            best_val_loss = avg_val_loss
+            model_save_path = os.path.join(f"SavedModels/{model_str}_best_model_{save_timestamp}.pt")
+            torch.save(model.state_dict(), model_save_path)
+            print("Best model saved!")
+        
+        experiment.log({
+            "epoch": epoch,
+            "lr": optimizer.param_groups[0]["lr"],
+            "train_loss": avg_epoch_loss,
+            "val_loss": avg_val_loss,
+            "train_acc": avg_epoch_acc,
+            "val_acc": avg_val_acc
+        })
 
 
 if __name__ == "__main__":

@@ -31,6 +31,11 @@ class BUSDataset(Dataset):
         return image, mask
 
 
+class ToTensor(object):
+    def __call__(self, img):
+        return F.pil_to_tensor(img)
+
+
 # Joint transforms taken from https://github.com/xorangecheng/GlobalGuidance-Net/blob/main/datasets/joint_transforms.py
 class Compose(object):
     def __init__(self, transforms):
@@ -46,7 +51,7 @@ class Compose(object):
 class ToPILImage(object):
     def __call__(self, img, mask):
         img = img.astype("float32")
-        mask = mask.astype("float32")
+        mask = mask.astype("uint8")
         return F.to_pil_image(img).convert("RGB"), F.to_pil_image(mask).convert("L")
     
 
