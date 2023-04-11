@@ -34,7 +34,7 @@ def get_parser():
         "--loss_fn",
         type=str,
         default="dice",
-        choices=["dice", "boundary"]
+        choices=["dice", "boundary", "db"]
     )
     parser.add_argument(
         "--epochs", 
@@ -133,6 +133,8 @@ def main(FLAGS):
         loss_fn = DiceLoss().cuda()
     elif loss_fn_str == "boundary":
         loss_fn = BoundaryLoss().cuda()
+    elif loss_fn_str == "db":
+        loss_fn = DiceBoundaryLoss(alpha=0.1).cuda()
     else:
         raise NotImplementedError
     metric = BinaryAccuracy().to(device)

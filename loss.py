@@ -36,6 +36,19 @@ class BoundaryLoss(nn.Module):
         return loss
 
 
+class DiceBoundaryLoss(nn.Module):
+    def __init__(self, alpha=0.5):
+        super().__init__()
+
+        self.alpha = alpha
+        self.dice_loss = DiceLoss()
+        self.boundary_loss = BoundaryLoss()
+    
+    def forward(self, y_pred, y_true):
+        return self.alpha * self.dice_loss(y_pred, y_true) \
+                + (1 - self.alpha) * self.boundary_loss(y_pred, y_true)
+
+
 if __name__ == "__main__":
     true = torch.ones((32, 1, 300, 300))
     pred = torch.zeros((32, 1, 300, 300))
