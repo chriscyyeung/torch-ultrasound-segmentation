@@ -147,11 +147,11 @@ def main(FLAGS):
 
     # Training loop
     save_timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    best_val_loss = np.inf
     for epoch in tqdm.tqdm(range(1, epochs + 1)):
         model.train()
         epoch_loss = 0
         epoch_acc = 0
-        best_val_loss = np.inf
         with tqdm.tqdm(total=len(train_dataloader)) as pbar:
             for epoch_idx, batch in enumerate(train_dataloader):
                 image, label = batch[0].to(device), batch[1].to(device)  # use gpu
