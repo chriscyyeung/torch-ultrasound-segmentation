@@ -198,19 +198,19 @@ def main(FLAGS):
 
                     if model_str == "unet":
                         val_output = model(val_image)
-                        val_loss = loss_fn(val_output, val_label)
-                        val_acc = metric(F.sigmoid(val_output), val_label)
+                        loss = loss_fn(val_output, val_label)
+                        acc = metric(F.sigmoid(val_output), val_label)
                     
                     elif model_str == "ggnet":
                         val_o0, val_o1, val_o2, val_o3, val_o4, val_o5 = model(val_image)
-                        val_loss = loss_fn(val_o0, val_label)
-                        val_acc = metric(F.sigmoid(val_o0), val_label)
+                        loss = loss_fn(val_o0, val_label)
+                        acc = metric(F.sigmoid(val_o0), val_label)
                     
-                    val_loss += val_loss.item()
-                    val_acc += val_acc
+                    val_loss += loss.item()
+                    val_acc += acc
 
                     pbar.update(1)
-                    pbar.set_description(f"loss: {val_loss.item():.4f}, acc: {val_acc:.4f}")
+                    pbar.set_description(f"loss: {loss.item():.4f}, acc: {acc:.4f}")
                     
             avg_val_loss = val_loss / (val_idx + 1)
             avg_val_acc = val_acc / (val_idx + 1)
