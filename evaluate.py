@@ -4,10 +4,11 @@ import json
 import tqdm
 import torch
 import torchvision.transforms as transforms
+import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torchmetrics.classification import BinaryAccuracy, JaccardIndex, Precision, Recall, Dice
 
-from dataset import *
+from dataset import BUSDataset, ToTensor, Compose, ToPILImage
 from Models.unet import UNet
 from Models.ggnet import GGNet
 from utils import *
@@ -45,8 +46,8 @@ def main(FLAGS):
     # Load data
     test_img_idx = list(range(28, 33))
     ultrasound_arrays, segmentation_arrays = load_ultrasound_data(data_arrays_fullpath)
-    train_ultrasounds = get_data_array(ultrasound_arrays, test_img_idx)
-    train_segmentations = get_data_array(segmentation_arrays, test_img_idx)
+    test_ultrasounds = get_data_array(ultrasound_arrays, test_img_idx)
+    test_segmentations = get_data_array(segmentation_arrays, test_img_idx)
 
     # Initialize transforms
     transform = transforms.Compose([
@@ -62,8 +63,8 @@ def main(FLAGS):
 
     # Create dataloader
     test_dataset = BUSDataset(
-        train_ultrasounds,
-        train_segmentations,
+        test_ultrasounds,
+        test_segmentations,
         transform=transform,
         target_transform=target_transform,
         joint_transform=joint_transform
@@ -72,10 +73,10 @@ def main(FLAGS):
 
     # Initialize metrics
     acc = BinaryAccuracy().to(device)
-    precision = Precision().to(device)
-    recall = Recall().to(device)
+    precision = Precision(task="binary").to(device)
+    recall = Recall(task="binary").to(device)
     dice = Dice().to(device)
-    jaccard = JaccardIndex().to(device)
+    jaccard = JaccardIndex(task="binary").to(device)
 
     # Load model
     model_str = os.path.basename(model_path).split("_")[0]
@@ -105,7 +106,7 @@ def main(FLAGS):
                 
                 elif model_str == "ggnet":
                     o0, o1, o2, o3, o4, o5 = model(image)
-                    o0 = F.sigmoid(o0)
+                    output = F.sigmoid(o0)
 
                 test_acc += acc(output, label)
                 test_precision += precision(output, label)
