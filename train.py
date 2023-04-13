@@ -183,27 +183,28 @@ def main(FLAGS):
 
                     if loss_fn_str == "dice":
                         loss0 = loss_fn(o0, label)
-                        loss1 = loss_fn(o1, label)
-                        loss2 = loss_fn(o2, label)
-                        loss3 = loss_fn(o3, label)
-                        loss4 = loss_fn(o4, label)
-                        loss5 = loss_fn(o5, label)
+                        # loss1 = loss_fn(o1, label)
+                        # loss2 = loss_fn(o2, label)
+                        # loss3 = loss_fn(o3, label)
+                        # loss4 = loss_fn(o4, label)
+                        # loss5 = loss_fn(o5, label)
                     elif loss_fn_str == "boundary":
                         loss0 = loss_fn(o0, dist_map)
-                        loss1 = loss_fn(o1, dist_map)
-                        loss2 = loss_fn(o2, dist_map)
-                        loss3 = loss_fn(o3, dist_map)
-                        loss4 = loss_fn(o4, dist_map)
-                        loss5 = loss_fn(o5, dist_map)
+                        # loss1 = loss_fn(o1, dist_map)
+                        # loss2 = loss_fn(o2, dist_map)
+                        # loss3 = loss_fn(o3, dist_map)
+                        # loss4 = loss_fn(o4, dist_map)
+                        # loss5 = loss_fn(o5, dist_map)
                     else:
                         loss0 = loss_fn(o0, label, dist_map)
-                        loss1 = loss_fn(o1, label, dist_map)
-                        loss2 = loss_fn(o2, label, dist_map)
-                        loss3 = loss_fn(o3, label, dist_map)
-                        loss4 = loss_fn(o4, label, dist_map)
-                        loss5 = loss_fn(o5, label, dist_map)
+                        # loss1 = loss_fn(o1, label, dist_map)
+                        # loss2 = loss_fn(o2, label, dist_map)
+                        # loss3 = loss_fn(o3, label, dist_map)
+                        # loss4 = loss_fn(o4, label, dist_map)
+                        # loss5 = loss_fn(o5, label, dist_map)
 
-                    loss = loss0 + loss1 + loss2 + loss3 + loss4 + loss5
+                    # loss = loss0 + loss1 + loss2 + loss3 + loss4 + loss5
+                    loss = loss0
                     acc = metric(F.sigmoid(o0), label)
 
                 loss.backward()

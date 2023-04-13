@@ -11,10 +11,11 @@ class DiceLoss(nn.Module):
     
     def forward(self, y_pred, y_true):
         y_pred = F.sigmoid(y_pred)
+        # y_pred = F.one_hot(y_pred.long(), num_classes=2).transpose(1, 4).squeeze(-1)
 
         # Flattened labels and predictions
-        y_true_f = y_true.view(-1)
-        y_pred_f = y_pred.view(-1)
+        y_true_f = y_true.contiguous().view(-1)
+        y_pred_f = y_pred.contiguous().view(-1)
 
         intersection = (y_true_f * y_pred_f).sum()
         dice = (2. * intersection + self.smooth) / (y_true_f.sum() + y_pred_f.sum() + self.smooth)
