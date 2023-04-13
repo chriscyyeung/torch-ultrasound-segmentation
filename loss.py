@@ -28,7 +28,7 @@ class BoundaryLoss(nn.Module):
         super().__init__()
     
     def forward(self, y_pred, dist_map):
-        y_pred = F.softmax(y_pred)
+        y_pred = F.softmax(y_pred, dim=1)
 
         multiplied = einsum("bkwh,bkwh->bkwh", y_pred, dist_map)
         loss = multiplied.mean()

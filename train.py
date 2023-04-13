@@ -105,7 +105,7 @@ def main(FLAGS):
         OneHotEncode()
     ])
     val_joint_transform = Compose([ToPILImage()])
-    dist_map_transform = transforms.Compose([OneHotToDistanceMap()])
+    dist_map_transform = transforms.Compose([OneHotToDistanceMap([1, 1])])
 
     # Initialize datasets
     train_dataset = BUSDataset(
@@ -131,7 +131,7 @@ def main(FLAGS):
     if model_str == "unet":
         model = UNet(3, 64, 1)
     elif model_str == "ggnet":
-        model = GGNet()
+        model = GGNet(num_classes=2)
     else:
         raise NotImplementedError
     model.to(device)

@@ -66,7 +66,7 @@ def main():
             if model_str == "unet":
                 model = UNet(3, 64, 1)
             elif model_str == "ggnet":
-                model = GGNet()
+                model = GGNet(num_classes=2)
             else:
                 raise ValueError(f"Could not parse model from saved model: {model_path}")
             model.load_state_dict(torch.load(model_path))

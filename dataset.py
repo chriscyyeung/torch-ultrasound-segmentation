@@ -1,6 +1,7 @@
 import random
 import numpy as np
 import torch
+import torch.nn as nn
 import torchvision.transforms.functional as F
 from PIL import Image
 from scipy.ndimage import distance_transform_edt
@@ -47,7 +48,7 @@ class ToTensor(object):
 
 class OneHotEncode(object):
     def __call__(self, img):
-        return F.one_hot(img, num_classes=2)
+        return nn.functional.one_hot(img.long(), num_classes=2).transpose(0, 3).squeeze(-1)
 
 
 # Joint transforms taken from https://github.com/xorangecheng/GlobalGuidance-Net/blob/main/datasets/joint_transforms.py
@@ -100,11 +101,12 @@ class OneHotToDistanceMap(object):
         self.resolution = resolution
 
     def __call__(self, img):
+        img = img.cpu().detach().numpy()
         res = np.zeros_like(img)
         for k in range(2):  # 2 classes
-            posmask = img[k].astype(np.bool)
+            posmask = img[:, k, ...].astype(np.bool)
             if posmask.any():
                 negmask = ~posmask
-                res[k] = distance_transform_edt(negmask, sampling=self.resolution) * negmask \
+                res[:, k, ...] = distance_transform_edt(negmask, sampling=self.resolution) * negmask \
                     - (distance_transform_edt(posmask, sampling=self.resolution) - 1) * posmask
-        return torch.from_numpy(res, dtype=np.uint8)
+        return torch.from_numpy(res)
