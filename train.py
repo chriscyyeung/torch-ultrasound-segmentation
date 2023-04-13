@@ -10,7 +10,8 @@ from torch.utils.data import DataLoader
 from torch.optim import SGD
 from torchmetrics.classification import BinaryAccuracy
 
-from dataset import *
+from dataset import BUSDataset, ToTensor, OneHotEncode, OneHotToDistanceMap
+from dataset import Compose, ToPILImage, FreeScale, RandomHorizontalFlip, RandomRotate
 from loss import *
 from Models.unet import UNet
 from Models.ggnet import GGNet
@@ -83,7 +84,10 @@ def main(FLAGS):
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
-    target_transform = transforms.Compose([ToTensor()])
+    target_transform = transforms.Compose([
+        ToTensor(), 
+        OneHotEncode()
+    ])
     joint_transform = Compose([
         ToPILImage(),
         FreeScale((256, 256)),
@@ -92,13 +96,16 @@ def main(FLAGS):
     ])
     val_transform = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Resize((256, 256), antialias=True),
+        transforms.Resize((256, 256), interpolation=transforms.InterpolationMode.BICUBIC, antialias=True),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
     val_target_transform = transforms.Compose([
         ToTensor(),
-        transforms.Resize((256, 256), antialias=True)])
+        transforms.Resize((256, 256), antialias=True),
+        OneHotEncode()
+    ])
     val_joint_transform = Compose([ToPILImage()])
+    dist_map_transform = transforms.Compose([OneHotToDistanceMap()])
 
     # Initialize datasets
     train_dataset = BUSDataset(
@@ -106,14 +113,16 @@ def main(FLAGS):
         train_segmentations, 
         transform=transform, 
         target_transform=target_transform,
-        joint_transform=joint_transform
+        joint_transform=joint_transform, 
+        dist_map_transform=dist_map_transform
     )
     val_dataset = BUSDataset(
         val_ultrasounds, 
         val_segmentations,
         transform=val_transform,
         target_transform=val_target_transform,
-        joint_transform=val_joint_transform
+        joint_transform=val_joint_transform, 
+        dist_map_transform=dist_map_transform
     )
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_dataloader = DataLoader(val_dataset, batch_size=batch_size)
@@ -156,23 +165,43 @@ def main(FLAGS):
         epoch_acc = 0
         with tqdm.tqdm(total=len(train_dataloader)) as pbar:
             for epoch_idx, batch in enumerate(train_dataloader):
-                image, label = batch[0].to(device), batch[1].to(device)  # use gpu
+                image, label, dist_map = batch[0].to(device), batch[1].to(device), batch[2].to(device)  # use gpu
                 optimizer.zero_grad()
 
                 if model_str == "unet":
                     output = model(image)
-                    loss = loss_fn(output, label)
+                    if loss_fn_str == "dice":
+                        loss = loss_fn(output, label)
+                    elif loss_fn_str == "boundary":
+                        loss = loss_fn(output, dist_map)
+                    else:
+                        loss = loss_fn(output, label, dist_map)
                     acc = metric(F.sigmoid(output), label)
 
                 elif model_str == "ggnet":
                     o0, o1, o2, o3, o4, o5 = model(image)
 
-                    loss0 = loss_fn(o0, label)
-                    loss1 = loss_fn(o1, label)
-                    loss2 = loss_fn(o2, label)
-                    loss3 = loss_fn(o3, label)
-                    loss4 = loss_fn(o4, label)
-                    loss5 = loss_fn(o5, label)
+                    if loss_fn_str == "dice":
+                        loss0 = loss_fn(o0, label)
+                        loss1 = loss_fn(o1, label)
+                        loss2 = loss_fn(o2, label)
+                        loss3 = loss_fn(o3, label)
+                        loss4 = loss_fn(o4, label)
+                        loss5 = loss_fn(o5, label)
+                    elif loss_fn_str == "boundary":
+                        loss0 = loss_fn(o0, dist_map)
+                        loss1 = loss_fn(o1, dist_map)
+                        loss2 = loss_fn(o2, dist_map)
+                        loss3 = loss_fn(o3, dist_map)
+                        loss4 = loss_fn(o4, dist_map)
+                        loss5 = loss_fn(o5, dist_map)
+                    else:
+                        loss0 = loss_fn(o0, label, dist_map)
+                        loss1 = loss_fn(o1, label, dist_map)
+                        loss2 = loss_fn(o2, label, dist_map)
+                        loss3 = loss_fn(o3, label, dist_map)
+                        loss4 = loss_fn(o4, label, dist_map)
+                        loss5 = loss_fn(o5, label, dist_map)
 
                     loss = loss0 + loss1 + loss2 + loss3 + loss4 + loss5
                     acc = metric(F.sigmoid(o0), label)
@@ -196,17 +225,22 @@ def main(FLAGS):
             val_acc = 0
             with tqdm.tqdm(total=len(val_dataloader)) as pbar:
                 for val_idx, batch in enumerate(val_dataloader):
-                    val_image, val_label = batch[0].to(device), batch[1].to(device)
+                    val_image, val_label, val_dist_map = batch[0].to(device), batch[1].to(device), batch[2].to(device)
 
                     if model_str == "unet":
                         val_output = model(val_image)
-                        loss = loss_fn(val_output, val_label)
                         acc = metric(F.sigmoid(val_output), val_label)
                     
                     elif model_str == "ggnet":
-                        val_o0, val_o1, val_o2, val_o3, val_o4, val_o5 = model(val_image)
-                        loss = loss_fn(val_o0, val_label)
-                        acc = metric(F.sigmoid(val_o0), val_label)
+                        val_output, val_o1, val_o2, val_o3, val_o4, val_o5 = model(val_image)
+                        acc = metric(F.sigmoid(val_output), val_label)
+                    
+                    if loss_fn_str == "dice":
+                        loss = loss_fn(val_output, val_label)
+                    elif loss_fn_str == "boundary":
+                        loss = loss_fn(val_output, val_dist_map)
+                    else:
+                        loss = loss_fn(val_output, val_label, val_dist_map)
                     
                     val_loss += loss.item()
                     val_acc += acc

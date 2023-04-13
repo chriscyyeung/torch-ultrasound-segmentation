@@ -3,10 +3,12 @@ channels:
   - pytorch
   - nvidia
   - conda-forge
+  - anaconda
 dependencies:
   - pip
   - python=3.9
   - matplotlib
+  - scipy
   - pytorch-cuda=11.8
   - torchvision
   - torchmetrics

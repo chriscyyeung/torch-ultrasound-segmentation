@@ -52,7 +52,7 @@ def main(FLAGS):
     # Initialize transforms
     transform = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Resize((256, 256), antialias=True),
+        transforms.Resize((256, 256), interpolation=transforms.InterpolationMode.BICUBIC, antialias=True),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
     target_transform = transforms.Compose([
@@ -99,7 +99,7 @@ def main(FLAGS):
     with tqdm.tqdm(total=len(test_dataloader)) as pbar:
         for i, batch in enumerate(test_dataloader):
             with torch.no_grad():
-                image, label = batch[0].to(device), batch[1].to(device)
+                image, label, _ = batch[0].to(device), batch[1].to(device), batch[2]
 
                 if model_str == "unet":
                     output = F.sigmoid(model(image))

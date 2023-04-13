@@ -27,10 +27,10 @@ class BoundaryLoss(nn.Module):
     def __init__(self):
         super().__init__()
     
-    def forward(self, y_pred, y_true):
-        y_pred = F.sigmoid(y_pred)
+    def forward(self, y_pred, dist_map):
+        y_pred = F.softmax(y_pred)
 
-        multiplied = einsum("bkwh,bkwh->bkwh", y_pred, y_true)
+        multiplied = einsum("bkwh,bkwh->bkwh", y_pred, dist_map)
         loss = multiplied.mean()
 
         return loss
@@ -44,9 +44,9 @@ class DiceBoundaryLoss(nn.Module):
         self.dice_loss = DiceLoss()
         self.boundary_loss = BoundaryLoss()
     
-    def forward(self, y_pred, y_true):
+    def forward(self, y_pred, y_true, dist_map):
         return self.alpha * self.dice_loss(y_pred, y_true) \
-                + (1 - self.alpha) * self.boundary_loss(y_pred, y_true)
+                + (1 - self.alpha) * self.boundary_loss(y_pred, dist_map)
 
 
 if __name__ == "__main__":
