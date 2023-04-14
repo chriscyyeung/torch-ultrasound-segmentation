@@ -14,11 +14,11 @@ def main():
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     model_paths = [
-        "c:/Users/Chris/Documents/CISC881/torch-ultrasound-segmentation/SavedModels/ggnet_best_model_20230410_223717.pt", 
-        "c:/Users/Chris/Documents/CISC881/torch-ultrasound-segmentation/SavedModels/ggnet_best_model_20230411_030455.pt", 
+        "c:/Users/Chris/Documents/CISC881/torch-ultrasound-segmentation/SavedModels/ggnet_best_model_20230413_194255.pt", 
+        "c:/Users/Chris/Documents/CISC881/torch-ultrasound-segmentation/SavedModels/ggnet_best_model_20230413_232639.pt", 
         "c:/Users/Chris/Documents/CISC881/torch-ultrasound-segmentation/SavedModels/unet_best_model_20230411_073221.pt", 
         "c:/Users/Chris/Documents/CISC881/torch-ultrasound-segmentation/SavedModels/unet_best_model_20230411_092018.pt", 
-        "c:/Users/Chris/Documents/CISC881/torch-ultrasound-segmentation/SavedModels/ggnet_best_model_20230411_112657.pt", 
+        "c:/Users/Chris/Documents/CISC881/torch-ultrasound-segmentation/SavedModels/ggnet_best_model_20230414_031108.pt", 
         "c:/Users/Chris/Documents/CISC881/torch-ultrasound-segmentation/SavedModels/unet_best_model_20230411_155528.pt"
     ]
 
@@ -45,7 +45,7 @@ def main():
     joint_transform = Compose([ToPILImage()])
 
     # Choose 1 image from each patient
-    test_indices = [90, 248, 387, 526]
+    test_indices = [110, 248, 400, 526]
     for i in range(len(test_indices)):
         image = test_ultrasounds[test_indices[i]]
         mask = test_segmentations[test_indices[i]]
@@ -75,12 +75,12 @@ def main():
 
             # Generate prediction
             if model_str == "unet":
-                output = F.sigmoid(model(image))
+                output = F.sigmoid(model(image)).detach().cpu().numpy()[0]
             
             elif model_str == "ggnet":
                 o0, o1, o2, o3, o4, o5 = model(image)
-                output = F.sigmoid(o0)
-            result = np.concatenate((result, output.detach().cpu().numpy()[0]), axis=0)
+                output = np.expand_dims(np.argmax(F.sigmoid(o0).detach().cpu().numpy()[0], axis=0), axis=0)
+            result = np.concatenate((result, output), axis=0)
             
         # Generate figure
         fig, axes = plt.subplots(1, 8, figsize=(30, 5))

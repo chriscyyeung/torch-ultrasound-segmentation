@@ -129,7 +129,7 @@ def main(FLAGS):
 
     # Initialize model
     if model_str == "unet":
-        model = UNet(3, 64, 1)
+        model = UNet(3, 64, 2)
     elif model_str == "ggnet":
         model = GGNet(num_classes=2)
     else:

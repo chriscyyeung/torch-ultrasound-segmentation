@@ -24,7 +24,7 @@ class BUSDataset(Dataset):
     def __getitem__(self, idx):
         image = self.images[idx]
         mask = self.masks[idx]
-        dist_map = None
+        dist_map = torch.zeros(mask.shape)
 
         if self.joint_transform:
             image, mask = self.joint_transform(image, mask)

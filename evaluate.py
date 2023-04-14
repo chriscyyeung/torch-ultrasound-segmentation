@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torchmetrics.classification import BinaryAccuracy, JaccardIndex, Precision, Recall, Dice
 
-from dataset import BUSDataset, ToTensor, Compose, ToPILImage
+from dataset import BUSDataset, ToTensor, Compose, ToPILImage, OneHotEncode
 from Models.unet import UNet
 from Models.ggnet import GGNet
 from utils import *
@@ -57,7 +57,8 @@ def main(FLAGS):
     ])
     target_transform = transforms.Compose([
         ToTensor(),
-        transforms.Resize((256, 256), antialias=True)
+        transforms.Resize((256, 256), antialias=True),
+        OneHotEncode()
     ])
     joint_transform = Compose([ToPILImage()])
 
@@ -81,7 +82,7 @@ def main(FLAGS):
     # Load model
     model_str = os.path.basename(model_path).split("_")[0]
     if model_str == "unet":
-        model = UNet(3, 64, 1)
+        model = UNet(3, 64, 2)
     elif model_str == "ggnet":
         model = GGNet(num_classes=2)
     else:
